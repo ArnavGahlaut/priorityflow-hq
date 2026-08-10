@@ -18,6 +18,7 @@ import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminQueuesRouteImport } from './routes/admin.queues'
 import { Route as AdminRulesRouteImport } from './routes/admin.rules'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminStaffRouteImport } from './routes/admin.staff'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppHistoryRouteImport } from './routes/app.history'
@@ -71,6 +72,11 @@ const AdminQueuesRoute = AdminQueuesRouteImport.update({
 const AdminRulesRoute = AdminRulesRouteImport.update({
   id: '/rules',
   path: '/rules',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminStaffRoute = AdminStaffRouteImport.update({
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/queues': typeof AdminQueuesRoute
   '/admin/rules': typeof AdminRulesRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
   '/app/history': typeof AppHistoryRoute
   '/app/new-request': typeof AppNewRequestRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/queues': typeof AdminQueuesRoute
   '/admin/rules': typeof AdminRulesRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
   '/app/history': typeof AppHistoryRoute
   '/app/new-request': typeof AppNewRequestRoute
@@ -166,6 +174,7 @@ export interface FileRoutesById {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/queues': typeof AdminQueuesRoute
   '/admin/rules': typeof AdminRulesRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/staff': typeof AdminStaffRoute
   '/app/history': typeof AppHistoryRoute
   '/app/new-request': typeof AppNewRequestRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/queues'
     | '/admin/rules'
+    | '/admin/settings'
     | '/admin/staff'
     | '/app/history'
     | '/app/new-request'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/queues'
     | '/admin/rules'
+    | '/admin/settings'
     | '/admin/staff'
     | '/app/history'
     | '/app/new-request'
@@ -225,6 +236,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/queues'
     | '/admin/rules'
+    | '/admin/settings'
     | '/admin/staff'
     | '/app/history'
     | '/app/new-request'
@@ -309,6 +321,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRulesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/staff': {
       id: '/admin/staff'
       path: '/staff'
@@ -380,6 +399,7 @@ interface AdminRouteChildren {
   AdminAuditRoute: typeof AdminAuditRoute
   AdminQueuesRoute: typeof AdminQueuesRoute
   AdminRulesRoute: typeof AdminRulesRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminStaffRoute: typeof AdminStaffRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -389,6 +409,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAuditRoute: AdminAuditRoute,
   AdminQueuesRoute: AdminQueuesRoute,
   AdminRulesRoute: AdminRulesRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminStaffRoute: AdminStaffRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
@@ -436,13 +457,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
