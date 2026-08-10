@@ -10,33 +10,238 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as OpsRouteImport } from './routes/ops'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as AdminQueuesRouteImport } from './routes/admin.queues'
+import { Route as AdminRulesRouteImport } from './routes/admin.rules'
+import { Route as AdminStaffRouteImport } from './routes/admin.staff'
+import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppHistoryRouteImport } from './routes/app.history'
+import { Route as AppNewRequestRouteImport } from './routes/app.new-request'
+import { Route as AppNotificationsRouteImport } from './routes/app.notifications'
+import { Route as AppQueueRouteImport } from './routes/app.queue'
+import { Route as OpsIndexRouteImport } from './routes/ops.index'
+import { Route as OpsCountersRouteImport } from './routes/ops.counters'
+import { Route as OpsTriageRouteImport } from './routes/ops.triage'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OpsRoute = OpsRouteImport.update({
+  id: '/ops',
+  path: '/ops',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminQueuesRoute = AdminQueuesRouteImport.update({
+  id: '/queues',
+  path: '/queues',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRulesRoute = AdminRulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminStaffRoute = AdminStaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHistoryRoute = AppHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNewRequestRoute = AppNewRequestRouteImport.update({
+  id: '/new-request',
+  path: '/new-request',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNotificationsRoute = AppNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppQueueRoute = AppQueueRouteImport.update({
+  id: '/queue',
+  path: '/queue',
+  getParentRoute: () => AppRoute,
+} as any)
+const OpsIndexRoute = OpsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => OpsRoute,
+} as any)
+const OpsCountersRoute = OpsCountersRouteImport.update({
+  id: '/counters',
+  path: '/counters',
+  getParentRoute: () => OpsRoute,
+} as any)
+const OpsTriageRoute = OpsTriageRouteImport.update({
+  id: '/triage',
+  path: '/triage',
+  getParentRoute: () => OpsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/app': typeof AppRouteWithChildren
+  '/ops': typeof OpsRouteWithChildren
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/queues': typeof AdminQueuesRoute
+  '/admin/rules': typeof AdminRulesRoute
+  '/admin/staff': typeof AdminStaffRoute
+  '/app/history': typeof AppHistoryRoute
+  '/app/new-request': typeof AppNewRequestRoute
+  '/app/notifications': typeof AppNotificationsRoute
+  '/app/queue': typeof AppQueueRoute
+  '/ops/counters': typeof OpsCountersRoute
+  '/ops/triage': typeof OpsTriageRoute
+  '/admin/': typeof AdminIndexRoute
+  '/app/': typeof AppIndexRoute
+  '/ops/': typeof OpsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/queues': typeof AdminQueuesRoute
+  '/admin/rules': typeof AdminRulesRoute
+  '/admin/staff': typeof AdminStaffRoute
+  '/app/history': typeof AppHistoryRoute
+  '/app/new-request': typeof AppNewRequestRoute
+  '/app/notifications': typeof AppNotificationsRoute
+  '/app/queue': typeof AppQueueRoute
+  '/ops/counters': typeof OpsCountersRoute
+  '/ops/triage': typeof OpsTriageRoute
+  '/admin': typeof AdminIndexRoute
+  '/app': typeof AppIndexRoute
+  '/ops': typeof OpsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/app': typeof AppRouteWithChildren
+  '/ops': typeof OpsRouteWithChildren
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/queues': typeof AdminQueuesRoute
+  '/admin/rules': typeof AdminRulesRoute
+  '/admin/staff': typeof AdminStaffRoute
+  '/app/history': typeof AppHistoryRoute
+  '/app/new-request': typeof AppNewRequestRoute
+  '/app/notifications': typeof AppNotificationsRoute
+  '/app/queue': typeof AppQueueRoute
+  '/ops/counters': typeof OpsCountersRoute
+  '/ops/triage': typeof OpsTriageRoute
+  '/admin/': typeof AdminIndexRoute
+  '/app/': typeof AppIndexRoute
+  '/ops/': typeof OpsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/app'
+    | '/ops'
+    | '/admin/analytics'
+    | '/admin/audit'
+    | '/admin/queues'
+    | '/admin/rules'
+    | '/admin/staff'
+    | '/app/history'
+    | '/app/new-request'
+    | '/app/notifications'
+    | '/app/queue'
+    | '/ops/counters'
+    | '/ops/triage'
+    | '/admin/'
+    | '/app/'
+    | '/ops/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/admin/analytics'
+    | '/admin/audit'
+    | '/admin/queues'
+    | '/admin/rules'
+    | '/admin/staff'
+    | '/app/history'
+    | '/app/new-request'
+    | '/app/notifications'
+    | '/app/queue'
+    | '/ops/counters'
+    | '/ops/triage'
+    | '/admin'
+    | '/app'
+    | '/ops'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/app'
+    | '/ops'
+    | '/admin/analytics'
+    | '/admin/audit'
+    | '/admin/queues'
+    | '/admin/rules'
+    | '/admin/staff'
+    | '/app/history'
+    | '/app/new-request'
+    | '/app/notifications'
+    | '/app/queue'
+    | '/ops/counters'
+    | '/ops/triage'
+    | '/admin/'
+    | '/app/'
+    | '/ops/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  AppRoute: typeof AppRouteWithChildren
+  OpsRoute: typeof OpsRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -48,22 +253,186 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ops': {
+      id: '/ops'
+      path: '/ops'
+      fullPath: '/ops'
+      preLoaderRoute: typeof OpsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/queues': {
+      id: '/admin/queues'
+      path: '/queues'
+      fullPath: '/admin/queues'
+      preLoaderRoute: typeof AdminQueuesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/rules': {
+      id: '/admin/rules'
+      path: '/rules'
+      fullPath: '/admin/rules'
+      preLoaderRoute: typeof AdminRulesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/staff': {
+      id: '/admin/staff'
+      path: '/staff'
+      fullPath: '/admin/staff'
+      preLoaderRoute: typeof AdminStaffRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/history': {
+      id: '/app/history'
+      path: '/history'
+      fullPath: '/app/history'
+      preLoaderRoute: typeof AppHistoryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/new-request': {
+      id: '/app/new-request'
+      path: '/new-request'
+      fullPath: '/app/new-request'
+      preLoaderRoute: typeof AppNewRequestRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/notifications': {
+      id: '/app/notifications'
+      path: '/notifications'
+      fullPath: '/app/notifications'
+      preLoaderRoute: typeof AppNotificationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/queue': {
+      id: '/app/queue'
+      path: '/queue'
+      fullPath: '/app/queue'
+      preLoaderRoute: typeof AppQueueRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/ops/': {
+      id: '/ops/'
+      path: '/'
+      fullPath: '/ops/'
+      preLoaderRoute: typeof OpsIndexRouteImport
+      parentRoute: typeof OpsRoute
+    }
+    '/ops/counters': {
+      id: '/ops/counters'
+      path: '/counters'
+      fullPath: '/ops/counters'
+      preLoaderRoute: typeof OpsCountersRouteImport
+      parentRoute: typeof OpsRoute
+    }
+    '/ops/triage': {
+      id: '/ops/triage'
+      path: '/triage'
+      fullPath: '/ops/triage'
+      preLoaderRoute: typeof OpsTriageRouteImport
+      parentRoute: typeof OpsRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminAuditRoute: typeof AdminAuditRoute
+  AdminQueuesRoute: typeof AdminQueuesRoute
+  AdminRulesRoute: typeof AdminRulesRoute
+  AdminStaffRoute: typeof AdminStaffRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
+  AdminAuditRoute: AdminAuditRoute,
+  AdminQueuesRoute: AdminQueuesRoute,
+  AdminRulesRoute: AdminRulesRoute,
+  AdminStaffRoute: AdminStaffRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface AppRouteChildren {
+  AppHistoryRoute: typeof AppHistoryRoute
+  AppNewRequestRoute: typeof AppNewRequestRoute
+  AppNotificationsRoute: typeof AppNotificationsRoute
+  AppQueueRoute: typeof AppQueueRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppHistoryRoute: AppHistoryRoute,
+  AppNewRequestRoute: AppNewRequestRoute,
+  AppNotificationsRoute: AppNotificationsRoute,
+  AppQueueRoute: AppQueueRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
+interface OpsRouteChildren {
+  OpsCountersRoute: typeof OpsCountersRoute
+  OpsTriageRoute: typeof OpsTriageRoute
+  OpsIndexRoute: typeof OpsIndexRoute
+}
+
+const OpsRouteChildren: OpsRouteChildren = {
+  OpsCountersRoute: OpsCountersRoute,
+  OpsTriageRoute: OpsTriageRoute,
+  OpsIndexRoute: OpsIndexRoute,
+}
+
+const OpsRouteWithChildren = OpsRoute._addFileChildren(OpsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  AppRoute: AppRouteWithChildren,
+  OpsRoute: OpsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
