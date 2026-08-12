@@ -1,8 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
 import { PageHeader } from "@/components/app-shell";
 import { Panel } from "@/components/metric-card";
-import { STAFF } from "@/lib/demo-data";
+import { getToken } from "@/lib/auth";
+
+interface StaffUser {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+}
 
 export const Route = createFileRoute("/admin/staff")({
   head: () => ({
@@ -17,6 +26,23 @@ export const Route = createFileRoute("/admin/staff")({
 });
 
 function Page() {
+  const [staff, setStaff] = useState<StaffUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch("http://localhost:5000/api/admin/staff", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (res.ok) setStaff(await res.json());
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
   return (
     <>
       <PageHeader title="Staff" subtitle="Staff directory, shifts, assigned roles and service performance." />
@@ -26,25 +52,35 @@ function Page() {
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th key="Name" className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Name</th>
-                  <th key="Role" className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Role</th>
-                  <th key="Shift" className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Shift</th>
-                  <th key="Status" className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Status</th>
-                  <th key="Served today" className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Served today</th>
-                  <th key="Avg service" className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Avg service</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Name</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Email</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Role</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {STAFF.map((r) => (
-                  <tr key={r.id} className="border-b border-border/50 transition-colors hover:bg-accent/40">
-                    <td className="px-4 py-3">{r.name}</td>
-                    <td className="px-4 py-3">{r.role}</td>
-                    <td className="num px-4 py-3">{r.shift}</td>
-                    <td className="px-4 py-3">{r.status}</td>
-                    <td className="num px-4 py-3">{r.servedToday}</td>
-                    <td className="num px-4 py-3">{`${r.avgServiceMin}m`}</td>
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                      Loading...
+                    </td>
                   </tr>
-                ))}
+                ) : staff.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                      No staff found
+                    </td>
+                  </tr>
+                ) : (
+                  staff.map((r) => (
+                    <tr key={r._id} className="border-b border-border/50 transition-colors hover:bg-accent/40">
+                      <td className="px-4 py-3">{r.name}</td>
+                      <td className="px-4 py-3">{r.email}</td>
+                      <td className="px-4 py-3">{r.role}</td>
+                      <td className="px-4 py-3">{r.status}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

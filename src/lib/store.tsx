@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -12,16 +11,13 @@ import { toast } from "sonner";
 
 import {
   INITIAL_AUDIT,
-  INITIAL_COUNTERS,
   INITIAL_NOTIFICATIONS,
-  INITIAL_REQUESTS,
   INITIAL_RULES,
   PRIORITY_ORDER,
-  QUEUES,
   STAFF,
   queueName,
 } from "./demo-data";
-import { evaluatePriority } from "./priority-engine";
+import { getToken } from "./auth";
 import type {
   AppNotification,
   AuditEvent,
@@ -75,111 +71,72 @@ interface Store {
   setPriority: (requestId: string, priority: Priority, actor?: string) => void;
   confirmPriority: (requestId: string) => void;
   sendForReview: (requestId: string) => void;
-  submitRequest: (payload: SubmitPayload) => ServiceRequest;
+  submitRequest: (payload: SubmitPayload) => Promise<ServiceRequest | undefined>;
   leaveQueue: (requestId: string) => void;
   toggleRule: (ruleId: string) => void;
   updateRule: (ruleId: string, patch: Partial<PriorityRule>) => void;
   markNotificationsRead: () => void;
+  loading: boolean;
 }
 
 const StoreContext = createContext<Store | null>(null);
+const API_BASE = "http://localhost:5000/api/queue";
 
-let seq = 9000;
-const uid = (prefix: string) => `${prefix}-${++seq}`;
-
-function stamp(offsetSeconds = 0) {
-  const d = new Date(Date.now() + offsetSeconds * 1000);
-  return d.toTimeString().slice(0, 8);
+function authHeaders() {
+  const token = getToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 function priorityRank(p: Priority) {
   return PRIORITY_ORDER.indexOf(p);
 }
 
-const INCOMING_POOL: { description: string; service: string }[] = [
-  { description: "Routine prescription renewal, no new symptoms.", service: "General Consultation" },
-  { description: "Pain in lower back getting worse since yesterday.", service: "Priority Assessment" },
-  { description: "Needs opening hours and a copy of last visit records.", service: "Support Desk" },
-  { description: "Passport and proof of address for verification.", service: "Document Verification" },
-  { description: "Shortness of breath after walking short distances.", service: "Priority Assessment" },
-  { description: "Annual check-in, feeling well.", service: "General Consultation" },
-  { description: "Wound from three days ago now spreading redness.", service: "Priority Assessment" },
-  { description: "Follow-up on physiotherapy plan.", service: "General Consultation" },
-];
-
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [requests, setRequests] = useState<ServiceRequest[]>(INITIAL_REQUESTS);
-  const [counters, setCounters] = useState<Counter[]>(INITIAL_COUNTERS);
-  const [queues, setQueues] = useState<Queue[]>(QUEUES);
-  const [rules, setRules] = useState<PriorityRule[]>(INITIAL_RULES);
+  const [requests, setRequests] = useState<ServiceRequest[]>([]);
+  const [counters, setCounters] = useState<Counter[]>([]);
+  const [queues, setQueues] = useState<Queue[]>([]);
+  const [rules] = useState<PriorityRule[]>(INITIAL_RULES);
   const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
-  const [audit, setAudit] = useState<AuditEvent[]>(INITIAL_AUDIT);
-  const [nextToken, setNextToken] = useState(148);
-  const [servedToday, setServedToday] = useState(186);
-  const incomingIndex = useRef(0);
+  const [audit] = useState<AuditEvent[]>(INITIAL_AUDIT);
+  const [servedToday] = useState(186);
+  const [loading, setLoading] = useState(true);
 
-  const log = useCallback((e: Omit<AuditEvent, "id" | "time">) => {
-    setAudit((prev) => [{ id: uid("aud"), time: stamp(), ...e }, ...prev].slice(0, 120));
-  }, []);
+  const fetchAll = useCallback(async () => {
+  const token = getToken();
+  if (!token) {
+    setLoading(false);
+    return;
+  }
+  try {
+    const [reqRes, counterRes, queueRes] = await Promise.all([
+      fetch(`${API_BASE}/requests`, { headers: authHeaders() }),
+      fetch(`${API_BASE}/counters`, { headers: authHeaders() }),
+      fetch(`${API_BASE}/queues`, { headers: authHeaders() }),
+    ]);
+    if (reqRes.ok) {
+      const data = await reqRes.json();
+      setRequests(data.map((r: any) => ({ ...r, id: r._id })));
+    }
+    if (counterRes.ok) {
+      const data = await counterRes.json();
+      setCounters(data.map((c: any) => ({ ...c, id: c._id })));
+    }
+    if (queueRes.ok) setQueues(await queueRes.json());
+  } catch (err) {
+    console.error("Failed to fetch queue data", err);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
-  const notify = useCallback((n: Omit<AppNotification, "id" | "time" | "unread">) => {
-    setNotifications((prev) =>
-      [{ id: uid("ntf"), time: stamp(), unread: true, ...n }, ...prev].slice(0, 40),
-    );
-  }, []);
-
-  /* ---- live simulation: service timers, arrivals, waiting clocks ---- */
   useEffect(() => {
-    const tick = setInterval(() => {
-      setCounters((prev) =>
-        prev.map((c) =>
-          c.status === "SERVING" ? { ...c, elapsedSeconds: c.elapsedSeconds + 1 } : c,
-        ),
-      );
-    }, 1000);
-
-    const waitClock = setInterval(() => {
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.status === "WAITING" ? { ...r, waitedMinutes: r.waitedMinutes + 1 } : r,
-        ),
-      );
-    }, 20000);
-
-    const arrivals = setInterval(() => {
-      const seed = INCOMING_POOL[incomingIndex.current % INCOMING_POOL.length]!;
-      incomingIndex.current += 1;
-      const evaluation = evaluatePriority(seed.description, seed.service, rules);
-      setNextToken((t) => {
-        const token = t + 1;
-        setRequests((prev) => [
-          ...prev,
-          {
-            id: uid("REQ"),
-            token,
-            priority: evaluation.priority,
-            suggestedPriority: evaluation.priority,
-            queueId: evaluation.queueId,
-            service: seed.service,
-            description: seed.description,
-            status: "WAITING",
-            waitedMinutes: 0,
-            submittedAt: stamp(),
-            reason: evaluation.reason,
-            reviewed: evaluation.priority === "NORMAL" || evaluation.priority === "LOW",
-            channel: "Web",
-          },
-        ]);
-        return token;
-      });
-    }, 14000);
-
-    return () => {
-      clearInterval(tick);
-      clearInterval(waitClock);
-      clearInterval(arrivals);
-    };
-  }, [rules]);
+    fetchAll();
+    const poll = setInterval(fetchAll, 4000);
+    return () => clearInterval(poll);
+  }, [fetchAll]);
 
   const waiting = useMemo(
     () =>
@@ -196,7 +153,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const serving = useMemo(() => requests.filter((r) => r.status === "SERVING"), [requests]);
   const myRequest = useMemo(
-    () => requests.find((r) => r.mine && r.status !== "COMPLETED" && r.status !== "LEFT"),
+    () => requests.find((r) => r.status !== "COMPLETED" && r.status !== "LEFT"),
     [requests],
   );
 
@@ -244,324 +201,191 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const callNext = useCallback(
-    (counterId: string) => {
-      const counter = counters.find((c) => c.id === counterId);
-      if (!counter) return;
-      if (counter.status === "PAUSED") {
-        toast.error(`${counter.name} is paused`, { description: "Resume the counter to call next." });
-        return;
-      }
-      if (counter.status === "SERVING") {
-        toast.error(`${counter.name} is busy`, { description: "Complete the active service first." });
-        return;
-      }
-      const activeQueues = counter.queues.filter(
-        (q) => !queues.find((qq) => qq.id === q)?.paused,
-      );
-      const next = waiting.find((r) => r.status === "WAITING" && activeQueues.includes(r.queueId));
-      if (!next) {
-        toast.message("Nothing to call", { description: "No waiting requests match this counter." });
-        return;
-      }
-      setRequests((prev) =>
-        prev.map((r) => (r.id === next.id ? { ...r, status: "CALLED", counterId } : r)),
-      );
-      setCounters((prev) =>
-        prev.map((c) => (c.id === counterId ? { ...c, servingToken: next.token } : c)),
-      );
-      log({
-        actor: "Staff · Operations",
-        action: "Called next",
-        requestId: next.id,
-        from: "WAITING",
-        to: "CALLED",
-      });
-      toast.success(`Token #${next.token} called`, {
-        description: `${next.priority} · ${counter.name}`,
-      });
-      if (next.mine) {
-        notify({
-          title: `Please proceed to ${counter.name}`,
-          body: `Token #${next.token} has been called.`,
-          kind: "counter",
+    async (counterId: string) => {
+      try {
+        const res = await fetch(`${API_BASE}/counters/${counterId}/call-next`, {
+          method: "PATCH",
+          headers: authHeaders(),
         });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || "Could not call next");
+          return;
+        }
+        toast.success(`Token #${data.request.token} called`);
+        fetchAll();
+      } catch {
+        toast.error("Network error");
       }
     },
-    [counters, queues, waiting, log, notify],
+    [fetchAll],
   );
 
   const startService = useCallback(
-    (counterId: string) => {
-      const counter = counters.find((c) => c.id === counterId);
-      const called = requests.find((r) => r.counterId === counterId && r.status === "CALLED");
-      if (!counter || !called) {
-        toast.error("No called request", { description: "Call next before starting service." });
-        return;
+    async (counterId: string) => {
+      try {
+        const res = await fetch(`${API_BASE}/counters/${counterId}/start`, {
+          method: "PATCH",
+          headers: authHeaders(),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || "Could not start service");
+          return;
+        }
+        fetchAll();
+      } catch {
+        toast.error("Network error");
       }
-      setRequests((prev) =>
-        prev.map((r) => (r.id === called.id ? { ...r, status: "SERVING" } : r)),
-      );
-      setCounters((prev) =>
-        prev.map((c) =>
-          c.id === counterId ? { ...c, status: "SERVING", elapsedSeconds: 0 } : c,
-        ),
-      );
-      log({
-        actor: "Staff · Operations",
-        action: "Service started",
-        requestId: called.id,
-        from: "CALLED",
-        to: "SERVING",
-      });
     },
-    [counters, requests, log],
+    [fetchAll],
   );
 
   const complete = useCallback(
-    (counterId: string) => {
-      const counter = counters.find((c) => c.id === counterId);
-      const active = requests.find(
-        (r) => r.counterId === counterId && (r.status === "SERVING" || r.status === "CALLED"),
-      );
-      if (!counter || !active) {
-        toast.error("Nothing in service at this counter");
-        return;
-      }
-      setRequests((prev) =>
-        prev.map((r) => (r.id === active.id ? { ...r, status: "COMPLETED" } : r)),
-      );
-      setCounters((prev) =>
-        prev.map((c) =>
-          c.id === counterId
-            ? {
-                ...c,
-                status: "AVAILABLE",
-                servingToken: undefined,
-                elapsedSeconds: 0,
-                servedToday: c.servedToday + 1,
-              }
-            : c,
-        ),
-      );
-      setServedToday((n) => n + 1);
-      log({
-        actor: "Staff · Operations",
-        action: "Service completed",
-        requestId: active.id,
-        from: "SERVING",
-        to: "COMPLETED",
-      });
-      toast.success(`Token #${active.token} completed`, { description: counter.name });
-    },
-    [counters, requests, log],
-  );
-
-  const transfer = useCallback(
-    (requestId: string, queueId: QueueId) => {
-      const target = requests.find((r) => r.id === requestId);
-      if (!target) return;
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === requestId
-            ? { ...r, queueId, status: "WAITING", counterId: undefined, waitedMinutes: 0 }
-            : r,
-        ),
-      );
-      setCounters((prev) =>
-        prev.map((c) =>
-          c.servingToken === target.token
-            ? { ...c, status: "AVAILABLE", servingToken: undefined, elapsedSeconds: 0 }
-            : c,
-        ),
-      );
-      log({
-        actor: "Staff · Operations",
-        action: "Request transferred",
-        requestId,
-        from: queueName(target.queueId),
-        to: queueName(queueId),
-      });
-      toast.success(`Token #${target.token} transferred`, { description: queueName(queueId) });
-    },
-    [requests, log],
-  );
-
-  const toggleQueuePause = useCallback(
-    (queueId: QueueId) => {
-      setQueues((prev) => {
-        const next = prev.map((q) => (q.id === queueId ? { ...q, paused: !q.paused } : q));
-        const q = next.find((x) => x.id === queueId)!;
-        log({
-          actor: "Staff · Operations",
-          action: q.paused ? "Queue paused" : "Queue resumed",
-          requestId: `QUEUE-${q.code}`,
-          from: q.paused ? "active" : "paused",
-          to: q.paused ? "paused" : "active",
+    async (counterId: string) => {
+      try {
+        const res = await fetch(`${API_BASE}/counters/${counterId}/complete`, {
+          method: "PATCH",
+          headers: authHeaders(),
         });
-        toast.message(`${q.name} ${q.paused ? "paused" : "resumed"}`);
-        return next;
-      });
-    },
-    [log],
-  );
-
-  const toggleCounterPause = useCallback(
-    (counterId: string) => {
-      setCounters((prev) =>
-        prev.map((c) =>
-          c.id === counterId
-            ? { ...c, status: c.status === "PAUSED" ? "AVAILABLE" : "PAUSED" }
-            : c,
-        ),
-      );
-    },
-    [],
-  );
-
-  const setPriority = useCallback(
-    (requestId: string, priority: Priority, actor = "Staff #24 · Lena Fischer") => {
-      const target = requests.find((r) => r.id === requestId);
-      if (!target || target.priority === priority) return;
-      const targetQueue: QueueId =
-        priority === "CRITICAL" ? "critical" : priority === "HIGH" ? "priority" : target.queueId;
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === requestId ? { ...r, priority, queueId: targetQueue, reviewed: true } : r,
-        ),
-      );
-      log({
-        actor,
-        action: "Priority changed",
-        requestId,
-        from: target.priority,
-        to: priority,
-      });
-      toast.success(`Token #${target.token} set to ${priority}`);
-      if (target.mine) {
-        notify({
-          title: "Your priority request has been reviewed",
-          body: `Priority updated to ${priority} by a triage lead.`,
-          kind: "review",
-        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || "Could not complete");
+          return;
+        }
+        toast.success(`Token #${data.request.token} completed`);
+        fetchAll();
+      } catch {
+        toast.error("Network error");
       }
     },
-    [requests, log, notify],
-  );
-
-  const confirmPriority = useCallback(
-    (requestId: string) => {
-      const target = requests.find((r) => r.id === requestId);
-      if (!target) return;
-      setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, reviewed: true } : r)));
-      log({
-        actor: "Staff #24 · Lena Fischer",
-        action: "Priority confirmed",
-        requestId,
-        from: "suggested",
-        to: target.priority,
-      });
-      toast.success(`Priority confirmed for #${target.token}`);
-    },
-    [requests, log],
-  );
-
-  const sendForReview = useCallback(
-    (requestId: string) => {
-      const target = requests.find((r) => r.id === requestId);
-      if (!target) return;
-      setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, reviewed: false } : r)));
-      log({
-        actor: "Staff · Operations",
-        action: "Sent for supervisor review",
-        requestId,
-        from: "operator",
-        to: "supervisor",
-      });
-      toast.message(`#${target.token} sent for supervisor review`);
-    },
-    [requests, log],
+    [fetchAll],
   );
 
   const submitRequest = useCallback(
-    (payload: SubmitPayload) => {
-      const token = nextToken + 1;
-      setNextToken(token);
-      const created: ServiceRequest = {
-        id: uid("REQ"),
-        token,
-        priority: payload.priority,
-        suggestedPriority: payload.priority,
-        queueId: payload.queueId,
-        service: payload.service,
-        description: payload.description,
-        status: "WAITING",
-        waitedMinutes: 0,
-        submittedAt: stamp(),
-        reason: payload.reason,
-        reviewed: payload.priority === "NORMAL" || payload.priority === "LOW",
-        mine: true,
-        channel: "Mobile",
-      };
-      setRequests((prev) => [
-        ...prev.map((r) => (r.mine && r.status === "WAITING" ? { ...r, mine: false } : r)),
-        created,
-      ]);
-      log({
-        actor: "User · Jordan Avery",
-        action: "Request submitted",
-        requestId: created.id,
-        from: "unrouted",
-        to: queueName(payload.queueId),
-      });
-      notify({
-        title: "Request received",
-        body: `Token #${token} routed to ${queueName(payload.queueId)}.`,
-        kind: "system",
-      });
-      return created;
-    },
-    [nextToken, log, notify],
-  );
-
-  const leaveQueue = useCallback(
-    (requestId: string) => {
-      const target = requests.find((r) => r.id === requestId);
-      if (!target) return;
-      setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: "LEFT" } : r)));
-      log({
-        actor: "User · Jordan Avery",
-        action: "Left queue",
-        requestId,
-        from: target.status,
-        to: "LEFT",
-      });
-      toast.message(`You left the queue`, { description: `Token #${target.token} released.` });
-    },
-    [requests, log],
-  );
-
-  const toggleRule = useCallback(
-    (ruleId: string) => {
-      setRules((prev) => {
-        const next = prev.map((r) => (r.id === ruleId ? { ...r, enabled: !r.enabled } : r));
-        const rule = next.find((r) => r.id === ruleId)!;
-        log({
-          actor: "Admin · Priya Raghavan",
-          action: rule.enabled ? "Rule enabled" : "Rule disabled",
-          requestId: `RULE-${rule.id}`,
-          from: rule.enabled ? "disabled" : "enabled",
-          to: rule.enabled ? "enabled" : "disabled",
+    async (payload: SubmitPayload) => {
+      try {
+        const res = await fetch(`${API_BASE}/requests`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            service: payload.service,
+            description: payload.description,
+            queueId: payload.queueId,
+            priority: payload.priority,
+            reason: payload.reason,
+            channel: "Web",
+          }),
         });
-        return next;
-      });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || "Could not submit request");
+          return undefined;
+        }
+        toast.success(`Token #${data.token} submitted`);
+        fetchAll();
+        return data as ServiceRequest;
+      } catch {
+        toast.error("Network error");
+        return undefined;
+      }
     },
-    [log],
+    [fetchAll],
   );
 
-  const updateRule = useCallback((ruleId: string, patch: Partial<PriorityRule>) => {
-    setRules((prev) => prev.map((r) => (r.id === ruleId ? { ...r, ...patch } : r)));
-  }, []);
+  // --- Not yet backed by API (kept local so UI doesn't break) ---
+  const transfer = useCallback(
+  async (requestId: string, queueId: QueueId) => {
+    const res = await fetch(`${API_BASE}/requests/${requestId}/transfer`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ queueId }),
+    });
+    if (res.ok) {
+      toast.success("Transferred");
+      fetchAll();
+    } else toast.error("Transfer failed");
+  },
+  [fetchAll],
+);
 
+const toggleQueuePause = useCallback(
+  async (queueId: QueueId) => {
+    const res = await fetch(`${API_BASE}/queues/${queueId}/toggle-pause`, {
+      method: "PATCH",
+      headers: authHeaders(),
+    });
+    if (res.ok) {
+      toast.success("Queue updated");
+      fetchAll();
+    } else toast.error("Failed");
+  },
+  [fetchAll],
+);
+
+const toggleCounterPause = useCallback((_counterId: string) => {
+  toast.message("Counter pause coming soon");
+}, []);
+
+const setPriority = useCallback(
+  async (requestId: string, priority: Priority) => {
+    const res = await fetch(`${API_BASE}/requests/${requestId}/priority`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ priority }),
+    });
+    if (res.ok) {
+      toast.success(`Priority set to ${priority}`);
+      fetchAll();
+    } else toast.error("Failed");
+  },
+  [fetchAll],
+);
+
+const confirmPriority = useCallback(
+  async (requestId: string) => {
+    const res = await fetch(`${API_BASE}/requests/${requestId}/confirm`, {
+      method: "PATCH",
+      headers: authHeaders(),
+    });
+    if (res.ok) {
+      toast.success("Confirmed");
+      fetchAll();
+    } else toast.error("Failed");
+  },
+  [fetchAll],
+);
+
+const sendForReview = useCallback(
+  async (requestId: string) => {
+    const res = await fetch(`${API_BASE}/requests/${requestId}/review`, {
+      method: "PATCH",
+      headers: authHeaders(),
+    });
+    if (res.ok) {
+      toast.success("Sent for review");
+      fetchAll();
+    } else toast.error("Failed");
+  },
+  [fetchAll],
+);
+
+const leaveQueue = useCallback(
+  async (requestId: string) => {
+    const res = await fetch(`${API_BASE}/requests/${requestId}/leave`, {
+      method: "PATCH",
+      headers: authHeaders(),
+    });
+    if (res.ok) {
+      toast.success("Left queue");
+      fetchAll();
+    } else toast.error("Failed");
+  },
+  [fetchAll],
+);
+
+  const toggleRule = useCallback((_ruleId: string) => {}, []);
+  const updateRule = useCallback((_ruleId: string, _patch: Partial<PriorityRule>) => {}, []);
   const markNotificationsRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
   }, []);
@@ -573,7 +397,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     rules,
     notifications,
     audit,
-    nextToken,
+    nextToken: 0,
     myRequest,
     waiting,
     serving,
@@ -596,6 +420,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toggleRule,
     updateRule,
     markNotificationsRead,
+    loading,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

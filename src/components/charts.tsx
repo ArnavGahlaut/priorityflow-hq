@@ -142,13 +142,20 @@ export function ThroughputChart({ height = 220 }: { height?: number }) {
   );
 }
 
-export function PriorityDonut({ height = 220 }: { height?: number }) {
+export function PriorityDonut({
+  height = 220,
+  data,
+}: {
+  height?: number;
+  data?: { name: string; value: number; color: string }[];
+}) {
+  const chartData = data && data.length ? data : PRIORITY_DISTRIBUTION;
   return (
     <ResponsiveContainer width="100%" height={height}>
       <PieChart>
         <Tooltip {...tooltipStyle} />
         <Pie
-          data={PRIORITY_DISTRIBUTION}
+          data={chartData}
           dataKey="value"
           nameKey="name"
           innerRadius="58%"
@@ -158,7 +165,7 @@ export function PriorityDonut({ height = 220 }: { height?: number }) {
           strokeWidth={2}
           animationDuration={1200}
         >
-          {PRIORITY_DISTRIBUTION.map((d) => (
+          {chartData.map((d) => (
             <Cell key={d.name} fill={d.color} />
           ))}
         </Pie>
@@ -167,11 +174,18 @@ export function PriorityDonut({ height = 220 }: { height?: number }) {
   );
 }
 
-export function UtilizationChart({ height = 220 }: { height?: number }) {
+export function UtilizationChart({
+  height = 220,
+  data,
+}: {
+  height?: number;
+  data?: { name: string; util: number }[];
+}) {
+  const chartData = data && data.length ? data : COUNTER_UTILIZATION;
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart
-        data={COUNTER_UTILIZATION}
+        data={chartData}
         layout="vertical"
         margin={{ top: 4, right: 12, left: 8, bottom: 0 }}
       >

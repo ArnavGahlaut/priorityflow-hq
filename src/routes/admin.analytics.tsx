@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo } from "react";
 
 import { PageHeader } from "@/components/app-shell";
 import { Panel } from "@/components/metric-card";
@@ -10,6 +11,14 @@ import {
   UtilizationChart,
   WaitChart,
 } from "@/components/charts";
+import { useStore } from "@/lib/store";
+
+const PRIORITY_COLORS: Record<string, string> = {
+  CRITICAL: "var(--chart-3)",
+  HIGH: "var(--chart-2)",
+  NORMAL: "var(--chart-1)",
+  LOW: "var(--chart-4)",
+};
 
 export const Route = createFileRoute("/admin/analytics")({
   head: () => ({
@@ -27,6 +36,27 @@ export const Route = createFileRoute("/admin/analytics")({
 });
 
 function Analytics() {
+  const { requests, counters } = useStore();
+
+  const priorityData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of requests) {
+      counts[r.priority] = (counts[r.priority] || 0) + 1;
+    }
+    return Object.entries(counts).map(([name, value]) => ({
+      name,
+      value,
+      color: PRIORITY_COLORS[name] || "var(--chart-1)",
+    }));
+  }, [requests]);
+
+  const utilizationData = useMemo(() => {
+    return counters.map((c) => ({
+      name: c.name,
+      util: c.status === "SERVING" ? 100 : c.status === "PAUSED" ? 0 : 30,
+    }));
+  }, [counters]);
+
   return (
     <>
       <PageHeader title="Analytics" subtitle="Demand, waiting and service performance over the day." />
@@ -40,11 +70,11 @@ function Analytics() {
         <Panel title="Throughput per hour">
           <ThroughputChart />
         </Panel>
-        <Panel title="Priority distribution">
-          <PriorityDonut />
+        <Panel title="Priority distribution (live)">
+          <PriorityDonut data={priorityData} />
         </Panel>
-        <Panel title="Counter utilization">
-          <UtilizationChart />
+        <Panel title="Counter utilization (live)">
+          <UtilizationChart data={utilizationData} />
         </Panel>
         <Panel title="Service duration by queue">
           <ServiceDurationChart />

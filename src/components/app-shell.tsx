@@ -20,6 +20,9 @@ import {
 import type { ComponentType, ReactNode } from "react";
 
 import { Logo } from "./logo";
+import { useNavigate } from "@tanstack/react-router";
+import { LogOut } from "lucide-react";
+import { logout } from "@/lib/auth";
 import { LiveDot } from "./priority-badge";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -114,6 +117,7 @@ export function AppShell({
 }) {
   const { metrics, notifications } = useStore();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
   const unread = notifications.filter((n) => n.unread).length;
 
   return (
@@ -201,6 +205,17 @@ export function AppShell({
                   <span className="block text-[10px] text-muted-foreground">{who.role}</span>
                 </span>
               </div>
+              <button
+                onClick={() => {
+                  logout();
+                  navigate({ to: "/login" });
+                }}
+                className="grid size-8 place-items-center border border-border text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Logout"
+                title="Logout"
+              >
+                <LogOut className="size-4" />
+              </button>
             </div>
           </header>
 

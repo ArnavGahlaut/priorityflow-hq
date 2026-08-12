@@ -32,7 +32,7 @@ export const Route = createFileRoute("/app/new-request")({
 });
 
 const STEPS = ["Select service", "Describe request", "Additional information", "Review"];
-const CONTACT = ["SMS", "Push notification", "Screen display only"];
+const CONTACT = ["SMS", "Email", "Push notification", "Screen display only"];
 const ACCESSIBILITY = [
   "Wheelchair access",
   "Interpreter needed",
@@ -46,20 +46,151 @@ function NewRequest() {
   const [step, setStep] = useState(0);
   const [service, setService] = useState(SERVICES[1]!.name);
   const [description, setDescription] = useState("");
-  const [contact, setContact] = useState(CONTACT[1]!);
+  const [contact, setContact] = useState(CONTACT[2]!);
   const [access, setAccess] = useState<string[]>([]);
   const [referredBy, setReferredBy] = useState("");
   const [created, setCreated] = useState<ServiceRequest | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // SMS OTP state
+  const [phone, setPhone] = useState("");
+  const [smsOtpSent, setSmsOtpSent] = useState(false);
+  const [smsOtpInput, setSmsOtpInput] = useState("");
+  const [smsVerified, setSmsVerified] = useState(false);
+  const [smsMessage, setSmsMessage] = useState("");
+  const [smsLoading, setSmsLoading] = useState(false);
+
+  // Email OTP state
+  const [email, setEmail] = useState("");
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailOtpInput, setEmailOtpInput] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailMessage, setEmailMessage] = useState("");
+  const [emailPreviewUrl, setEmailPreviewUrl] = useState("");
+  const [emailLoading, setEmailLoading] = useState(false);
 
   const evaluation = useMemo(
     () => evaluatePriority(description, service, rules),
     [description, service, rules],
   );
 
-  const canAdvance = step === 0 ? Boolean(service) : step === 1 ? description.trim().length > 12 : true;
+  const needsVerification = contact === "SMS" || contact === "Email";
+  const verificationDone =
+    contact === "SMS" ? smsVerified : contact === "Email" ? emailVerified : true;
 
-  function submit() {
-    const req = submitRequest({
+  const canAdvance =
+    step === 0
+      ? Boolean(service)
+      : step === 1
+        ? description.trim().length > 12
+        : step === 2
+          ? !needsVerification || verificationDone
+          : true;
+
+  async function sendSmsOtp() {
+    if (!phone.trim()) {
+      setSmsMessage("Enter a phone number first");
+      return;
+    }
+    setSmsLoading(true);
+    setSmsMessage("");
+    try {
+      const res = await fetch("http://localhost:5000/api/otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSmsOtpSent(true);
+        setSmsMessage(`OTP sent (demo — code: ${data.demoOtp})`);
+      } else {
+        setSmsMessage(data.error || "Failed to send OTP");
+      }
+    } catch {
+      setSmsMessage("Network error");
+    } finally {
+      setSmsLoading(false);
+    }
+  }
+
+  async function verifySmsOtp() {
+    setSmsLoading(true);
+    setSmsMessage("");
+    try {
+      const res = await fetch("http://localhost:5000/api/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, otp: smsOtpInput }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSmsVerified(true);
+        setSmsMessage("Phone verified");
+      } else {
+        setSmsMessage(data.error || "Invalid OTP");
+      }
+    } catch {
+      setSmsMessage("Network error");
+    } finally {
+      setSmsLoading(false);
+    }
+  }
+
+  async function sendEmailOtp() {
+    if (!email.trim()) {
+      setEmailMessage("Enter an email address first");
+      return;
+    }
+    setEmailLoading(true);
+    setEmailMessage("");
+    try {
+      const res = await fetch("http://localhost:5000/api/otp/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailOtpSent(true);
+        setEmailPreviewUrl(data.previewUrl || "");
+        setEmailMessage("OTP sent — check your email");
+      } else {
+        setEmailMessage(data.error || "Failed to send OTP");
+      }
+    } catch {
+      setEmailMessage("Network error");
+    } finally {
+      setEmailLoading(false);
+    }
+  }
+
+  async function verifyEmailOtp() {
+    setEmailLoading(true);
+    setEmailMessage("");
+    try {
+      const res = await fetch("http://localhost:5000/api/otp/email/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp: emailOtpInput }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailVerified(true);
+        setEmailMessage("Email verified");
+      } else {
+        setEmailMessage(data.error || "Invalid OTP");
+      }
+    } catch {
+      setEmailMessage("Network error");
+    } finally {
+      setEmailLoading(false);
+    }
+  }
+
+  async function submit() {
+    setSubmitting(true);
+    const req = await submitRequest({
       service,
       description: description.trim(),
       queueId: evaluation.queueId,
@@ -69,7 +200,8 @@ function NewRequest() {
       accessibility: access,
       referredBy,
     });
-    setCreated(req);
+    setSubmitting(false);
+    if (req) setCreated(req);
   }
 
   if (created) {
@@ -133,6 +265,14 @@ function NewRequest() {
                     setCreated(null);
                     setStep(0);
                     setDescription("");
+                    setSmsOtpSent(false);
+                    setSmsVerified(false);
+                    setPhone("");
+                    setSmsOtpInput("");
+                    setEmailOtpSent(false);
+                    setEmailVerified(false);
+                    setEmail("");
+                    setEmailOtpInput("");
                   }}
                   className="border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
                 >
@@ -268,6 +408,134 @@ function NewRequest() {
                       ))}
                     </div>
                   </div>
+
+                  {contact === "SMS" ? (
+                    <div className="border border-border bg-background/60 p-4">
+                      <span className="eyebrow">Verify phone number</span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <input
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          disabled={smsVerified}
+                          placeholder="Phone number"
+                          className="focus-ring min-w-0 flex-1 border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
+                        />
+                        <button
+                          type="button"
+                          onClick={sendSmsOtp}
+                          disabled={smsLoading || smsVerified}
+                          className="border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                        >
+                          {smsOtpSent ? "Resend OTP" : "Send OTP"}
+                        </button>
+                      </div>
+                      {smsOtpSent && !smsVerified ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <input
+                            value={smsOtpInput}
+                            onChange={(e) => setSmsOtpInput(e.target.value)}
+                            placeholder="Enter OTP"
+                            maxLength={4}
+                            className="focus-ring w-32 border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70"
+                          />
+                          <button
+                            type="button"
+                            onClick={verifySmsOtp}
+                            disabled={smsLoading || smsOtpInput.length < 4}
+                            className="bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                          >
+                            Verify
+                          </button>
+                        </div>
+                      ) : null}
+                      {smsMessage ? (
+                        <p
+                          className={cn(
+                            "mt-2 text-xs",
+                            smsVerified ? "text-success" : "text-muted-foreground",
+                          )}
+                        >
+                          {smsVerified ? "✓ " : ""}
+                          {smsMessage}
+                        </p>
+                      ) : null}
+                      {!smsVerified ? (
+                        <p className="mt-2 text-[11px] text-high">
+                          Verification required before continuing.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {contact === "Email" ? (
+                    <div className="border border-border bg-background/60 p-4">
+                      <span className="eyebrow">Verify email address</span>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          disabled={emailVerified}
+                          placeholder="you@example.com"
+                          className="focus-ring min-w-0 flex-1 border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
+                        />
+                        <button
+                          type="button"
+                          onClick={sendEmailOtp}
+                          disabled={emailLoading || emailVerified}
+                          className="border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                        >
+                          {emailOtpSent ? "Resend OTP" : "Send OTP"}
+                        </button>
+                      </div>
+                      {emailOtpSent && !emailVerified ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <input
+                            value={emailOtpInput}
+                            onChange={(e) => setEmailOtpInput(e.target.value)}
+                            placeholder="Enter OTP"
+                            maxLength={4}
+                            className="focus-ring w-32 border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground/70"
+                          />
+                          <button
+                            type="button"
+                            onClick={verifyEmailOtp}
+                            disabled={emailLoading || emailOtpInput.length < 4}
+                            className="bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                          >
+                            Verify
+                          </button>
+                        </div>
+                      ) : null}
+                      {emailPreviewUrl && !emailVerified ? (
+                        <a
+                          href={emailPreviewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 block text-xs text-primary underline"
+                        >
+                          Open sent email (test inbox)
+                        </a>
+                      ) : null}
+                      {emailMessage ? (
+                        <p
+                          className={cn(
+                            "mt-2 text-xs",
+                            emailVerified ? "text-success" : "text-muted-foreground",
+                          )}
+                        >
+                          {emailVerified ? "✓ " : ""}
+                          {emailMessage}
+                        </p>
+                      ) : null}
+                      {!emailVerified ? (
+                        <p className="mt-2 text-[11px] text-high">
+                          Verification required before continuing.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   <div>
                     <span className="eyebrow">Accessibility & support</span>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -366,9 +634,10 @@ function NewRequest() {
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={submit}
-              className="inline-flex items-center gap-2 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              disabled={submitting}
+              className="inline-flex items-center gap-2 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              Submit request <Check className="size-4" />
+              {submitting ? "Submitting..." : "Submit request"} <Check className="size-4" />
             </motion.button>
           )}
         </div>
