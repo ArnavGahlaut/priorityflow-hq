@@ -32,7 +32,7 @@ function Page() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("http://localhost:5000/api/admin/staff", {
+        const res = await fetch("http://10.233.230.170:5000/api/admin/staff", {
           headers: { Authorization: `Bearer ${getToken()}` },
         });
         if (res.ok) setStaff(await res.json());

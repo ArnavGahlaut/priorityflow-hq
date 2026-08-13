@@ -1,6 +1,7 @@
 import express from "express";
 import User from "../models/User.js";
 import PriorityRule from "../models/PriorityRule.js";
+import AuditEvent from "../models/AuditEvent.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -32,6 +33,11 @@ router.patch("/rules/:id", requireAuth, requireRole("ADMIN"), async (req, res) =
   const rule = await PriorityRule.findByIdAndUpdate(req.params.id, req.body, { new: true });
   if (!rule) return res.status(404).json({ error: "Rule not found" });
   res.json(rule);
+});
+
+router.get("/audit", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  const events = await AuditEvent.find().sort({ time: -1 }).limit(100);
+  res.json(events);
 });
 
 export default router;

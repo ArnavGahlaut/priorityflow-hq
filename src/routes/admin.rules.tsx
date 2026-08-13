@@ -34,7 +34,7 @@ function Page() {
 
   async function load() {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/rules", {
+      const res = await fetch("http://10.233.230.170:5000/api/admin/rules", {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
 
@@ -52,7 +52,7 @@ function Page() {
 
   async function toggleRule(id: string) {
     const res = await fetch(
-      `http://localhost:5000/api/admin/rules/${id}/toggle`,
+      `http://10.233.230.170:5000/api/admin/rules/${id}/toggle`,
       {
         method: "PATCH",
         headers: {
@@ -73,7 +73,7 @@ function Page() {
     id: string,
     updates: Partial<Pick<Rule, "weight" | "keywords">>,
   ) {
-    const res = await fetch(`http://localhost:5000/api/admin/rules/${id}`, {
+    const res = await fetch(`http://10.233.230.170:5000/api/admin/rules/${id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",

@@ -2,9 +2,18 @@ import express from "express";
 import Request from "../models/Request.js";
 import Counter from "../models/Counter.js";
 import Queue from "../models/Queue.js";
+import AuditEvent from "../models/AuditEvent.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = express.Router();
+
+async function logAudit(actor, action, requestId, from, to) {
+  try {
+    await AuditEvent.create({ actor, action, requestId, from, to });
+  } catch (err) {
+    console.error("Audit log failed", err);
+  }
+}
 
 router.get("/requests", requireAuth, async (req, res) => {
   const requests = await Request.find().sort({ priority: 1, submittedAt: 1 });
@@ -37,6 +46,9 @@ router.post("/requests", requireAuth, async (req, res) => {
       channel: channel || "Web",
       reviewed: priority === "NORMAL" || priority === "LOW",
     });
+
+    await logAudit("User", "Request submitted", `#${token}`, "unrouted", queueId);
+
     res.json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -71,6 +83,8 @@ router.patch("/counters/:id/call-next", requireAuth, async (req, res) => {
   counter.servingToken = next.token;
   await counter.save();
 
+  await logAudit("Staff", "Called next", `#${next.token}`, "WAITING", "CALLED");
+
   res.json({ counter, request: next });
 });
 
@@ -84,6 +98,8 @@ router.patch("/counters/:id/start", requireAuth, async (req, res) => {
   counter.status = "SERVING";
   counter.elapsedSeconds = 0;
   await counter.save();
+
+  await logAudit("Staff", "Service started", `#${called.token}`, "CALLED", "SERVING");
 
   res.json({ counter, request: called });
 });
@@ -105,15 +121,17 @@ router.patch("/counters/:id/complete", requireAuth, async (req, res) => {
   counter.servedToday += 1;
   await counter.save();
 
+  await logAudit("Staff", "Service completed", `#${active.token}`, "SERVING", "COMPLETED");
+
   res.json({ counter, request: active });
 });
-
-// --- NEW ROUTES ---
 
 router.patch("/requests/:id/transfer", requireAuth, async (req, res) => {
   const { queueId } = req.body;
   const request = await Request.findById(req.params.id);
   if (!request) return res.status(404).json({ error: "Request not found" });
+
+  const oldQueue = request.queueId;
 
   if (request.counterId) {
     await Counter.findOneAndUpdate(
@@ -128,6 +146,8 @@ router.patch("/requests/:id/transfer", requireAuth, async (req, res) => {
   request.waitedMinutes = 0;
   await request.save();
 
+  await logAudit("Staff", "Request transferred", `#${request.token}`, oldQueue, queueId);
+
   res.json(request);
 });
 
@@ -136,10 +156,14 @@ router.patch("/requests/:id/priority", requireAuth, async (req, res) => {
   const request = await Request.findById(req.params.id);
   if (!request) return res.status(404).json({ error: "Request not found" });
 
+  const oldPriority = request.priority;
+
   request.priority = priority;
   request.queueId = priority === "CRITICAL" ? "critical" : priority === "HIGH" ? "priority" : request.queueId;
   request.reviewed = true;
   await request.save();
+
+  await logAudit("Staff", "Priority changed", `#${request.token}`, oldPriority, priority);
 
   res.json(request);
 });
@@ -149,6 +173,7 @@ router.patch("/requests/:id/confirm", requireAuth, async (req, res) => {
   if (!request) return res.status(404).json({ error: "Request not found" });
   request.reviewed = true;
   await request.save();
+  await logAudit("Staff", "Priority confirmed", `#${request.token}`, "suggested", request.priority);
   res.json(request);
 });
 
@@ -157,6 +182,7 @@ router.patch("/requests/:id/review", requireAuth, async (req, res) => {
   if (!request) return res.status(404).json({ error: "Request not found" });
   request.reviewed = false;
   await request.save();
+  await logAudit("Staff", "Sent for review", `#${request.token}`, "operator", "supervisor");
   res.json(request);
 });
 
@@ -165,6 +191,7 @@ router.patch("/requests/:id/leave", requireAuth, async (req, res) => {
   if (!request) return res.status(404).json({ error: "Request not found" });
   request.status = "LEFT";
   await request.save();
+  await logAudit("User", "Left queue", `#${request.token}`, request.status, "LEFT");
   res.json(request);
 });
 
@@ -173,6 +200,7 @@ router.patch("/queues/:id/toggle-pause", requireAuth, async (req, res) => {
   if (!queue) return res.status(404).json({ error: "Queue not found" });
   queue.paused = !queue.paused;
   await queue.save();
+  await logAudit("Admin", queue.paused ? "Queue paused" : "Queue resumed", queue.name, "", "");
   res.json(queue);
 });
 

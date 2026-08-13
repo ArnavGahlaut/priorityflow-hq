@@ -80,7 +80,7 @@ interface Store {
 }
 
 const StoreContext = createContext<Store | null>(null);
-const API_BASE = "http://localhost:5000/api/queue";
+const API_BASE = "http://10.233.230.170:5000/api/queue";
 
 function authHeaders() {
   const token = getToken();

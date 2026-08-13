@@ -95,7 +95,7 @@ function NewRequest() {
     setSmsLoading(true);
     setSmsMessage("");
     try {
-      const res = await fetch("http://localhost:5000/api/otp/send", {
+      const res = await fetch("http://10.233.230.170:5000/api/otp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
@@ -118,7 +118,7 @@ function NewRequest() {
     setSmsLoading(true);
     setSmsMessage("");
     try {
-      const res = await fetch("http://localhost:5000/api/otp/verify", {
+      const res = await fetch("http://10.233.230.170:5000/api/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, otp: smsOtpInput }),
@@ -145,7 +145,7 @@ function NewRequest() {
     setEmailLoading(true);
     setEmailMessage("");
     try {
-      const res = await fetch("http://localhost:5000/api/otp/email/send", {
+      const res = await fetch("http://10.233.230.170:5000/api/otp/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -169,7 +169,7 @@ function NewRequest() {
     setEmailLoading(true);
     setEmailMessage("");
     try {
-      const res = await fetch("http://localhost:5000/api/otp/email/verify", {
+      const res = await fetch("http://10.233.230.170:5000/api/otp/email/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp: emailOtpInput }),
