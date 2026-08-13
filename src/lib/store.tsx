@@ -122,7 +122,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     if (counterRes.ok) {
       const data = await counterRes.json();
-      setCounters(data.map((c: any) => ({ ...c, id: c._id })));
+      setCounters((prev) =>
+        data.map((c: any) => {
+          const existing = prev.find((p) => p.id === c._id);
+          const keepElapsed =
+            existing && existing.status === "SERVING" && c.status === "SERVING";
+          return {
+            ...c,
+            id: c._id,
+            elapsedSeconds: keepElapsed ? existing.elapsedSeconds : c.elapsedSeconds,
+          };
+        }),
+      );
     }
     if (queueRes.ok) setQueues(await queueRes.json());
   } catch (err) {
@@ -137,11 +148,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const poll = setInterval(fetchAll, 4000);
     return () => clearInterval(poll);
   }, [fetchAll]);
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setCounters((prev) =>
+        prev.map((c) =>
+          c.status === "SERVING" ? { ...c, elapsedSeconds: c.elapsedSeconds + 1 } : c,
+        ),
+      );
+    }, 1000);
+    return () => clearInterval(tick);
+  }, []);
+
+
 
   const waiting = useMemo(
     () =>
       requests
         .filter((r) => r.status === "WAITING" || r.status === "CALLED")
+        .map((r) => ({
+          ...r,
+          waitedMinutes: Math.floor(
+            (Date.now() - new Date(r.submittedAt).getTime()) / 60000,
+          ),
+        }))
         .sort(
           (a, b) =>
             priorityRank(a.priority) - priorityRank(b.priority) ||
@@ -150,7 +179,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ),
     [requests],
   );
-
   const serving = useMemo(() => requests.filter((r) => r.status === "SERVING"), [requests]);
   const myRequest = useMemo(
     () => requests.find((r) => r.status !== "COMPLETED" && r.status !== "LEFT"),

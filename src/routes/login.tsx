@@ -31,7 +31,7 @@ function LoginPage() {
     setOtpLoading(true);
     setOtpMessage("");
     try {
-      const res = await fetch("http://localhost:5000/api/otp/email/send", {
+      const res = await fetch("http://10.233.230.170:5000/api/otp/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -55,7 +55,7 @@ function LoginPage() {
     setOtpLoading(true);
     setOtpMessage("");
     try {
-      const res = await fetch("http://localhost:5000/api/otp/email/verify", {
+      const res = await fetch("http://10.233.230.170:5000/api/otp/email/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp: otpInput }),
@@ -86,7 +86,7 @@ function LoginPage() {
     setLoading(true);
     try {
       const endpoint = isRegister ? "register" : "login";
-      const res = await fetch(`http://localhost:5000/api/auth/${endpoint}`, {
+      const res = await fetch(`http://10.233.230.170:5000/api/auth/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
