@@ -31,7 +31,7 @@ function Page() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("http://10.233.230.170:5000/api/admin/audit", {
+        const res = await fetch("https://priorityflow-api.onrender.com/api/admin/audit", {
           headers: { Authorization: `Bearer ${getToken()}` },
         });
         if (res.ok) setAudit(await res.json());
