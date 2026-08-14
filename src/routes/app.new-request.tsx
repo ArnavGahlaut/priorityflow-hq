@@ -150,11 +150,15 @@ function NewRequest() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
+            const data = await res.json();
       if (res.ok) {
         setEmailOtpSent(true);
         setEmailPreviewUrl(data.previewUrl || "");
-        setEmailMessage("OTP sent — check your email");
+        setEmailMessage(
+          data.demoOtp
+            ? `Demo mode — your code is: ${data.demoOtp}`
+            : "OTP sent — check your email",
+        );
       } else {
         setEmailMessage(data.error || "Failed to send OTP");
       }
