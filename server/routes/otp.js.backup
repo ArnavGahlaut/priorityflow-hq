@@ -36,8 +36,26 @@ router.post("/email/send", async (req, res) => {
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     emailOtpStore.set(email, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
 
-    console.log(`[EMAIL OTP - DEMO MODE] ${email}: ${otp}`);
-    res.json({ success: true, demoOtp: otp });
+    const testAccount = await nodemailer.createTestAccount();
+    const transporter = nodemailer.createTransport({
+      host: "smtp.ethereal.email",
+      port: 587,
+      secure: false,
+      auth: { user: testAccount.user, pass: testAccount.pass },
+    });
+
+    const info = await transporter.sendMail({
+      from: '"PriorityQ" <no-reply@priorityq.com>',
+      to: email,
+      subject: "Your PriorityQ verification code",
+      text: `Your OTP is ${otp}. It expires in 5 minutes.`,
+      html: `<p>Your PriorityQ verification code is:</p><h2>${otp}</h2><p>Expires in 5 minutes.</p>`,
+    });
+
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    console.log(`[EMAIL OTP] ${email}: ${otp} — Preview: ${previewUrl}`);
+
+    res.json({ success: true, previewUrl });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
