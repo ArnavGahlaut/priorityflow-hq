@@ -204,4 +204,12 @@ router.patch("/queues/:id/toggle-pause", requireAuth, async (req, res) => {
   res.json(queue);
 });
 
+
+router.get("/requests/history", requireAuth, async (req, res) => {
+  const history = await Request.find({
+    owner: req.user.id,
+    status: { $in: ["COMPLETED", "LEFT"] },
+  }).sort({ submittedAt: -1 });
+  res.json(history);
+});
 export default router;

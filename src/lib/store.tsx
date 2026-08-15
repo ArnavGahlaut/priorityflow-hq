@@ -17,7 +17,7 @@ import {
   STAFF,
   queueName,
 } from "./demo-data";
-import { getToken } from "./auth";
+import { getToken, getUser } from "./auth";
 import type {
   AppNotification,
   AuditEvent,
@@ -181,7 +181,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
   const serving = useMemo(() => requests.filter((r) => r.status === "SERVING"), [requests]);
   const myRequest = useMemo(
-    () => requests.find((r) => r.status !== "COMPLETED" && r.status !== "LEFT"),
+    () => {
+      const user = getUser();
+      return requests.find(
+        (r) => r.owner === user?.id && r.status !== "COMPLETED" && r.status !== "LEFT",
+      );
+    },
     [requests],
   );
 

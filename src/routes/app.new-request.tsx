@@ -52,7 +52,6 @@ function NewRequest() {
   const [created, setCreated] = useState<ServiceRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // SMS OTP state
   const [phone, setPhone] = useState("");
   const [smsOtpSent, setSmsOtpSent] = useState(false);
   const [smsOtpInput, setSmsOtpInput] = useState("");
@@ -60,7 +59,6 @@ function NewRequest() {
   const [smsMessage, setSmsMessage] = useState("");
   const [smsLoading, setSmsLoading] = useState(false);
 
-  // Email OTP state
   const [email, setEmail] = useState("");
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailOtpInput, setEmailOtpInput] = useState("");
@@ -150,7 +148,7 @@ function NewRequest() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-            const data = await res.json();
+      const data = await res.json();
       if (res.ok) {
         setEmailOtpSent(true);
         setEmailPreviewUrl(data.previewUrl || "");
