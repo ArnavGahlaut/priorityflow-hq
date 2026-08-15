@@ -28,6 +28,14 @@ router.get("/requests/mine", requireAuth, async (req, res) => {
   res.json(myRequest);
 });
 
+router.get("/requests/history", requireAuth, async (req, res) => {
+  const history = await Request.find({
+    owner: req.user.id,
+    status: { $in: ["COMPLETED", "LEFT"] },
+  }).sort({ submittedAt: -1 });
+  res.json(history);
+});
+
 router.post("/requests", requireAuth, async (req, res) => {
   try {
     const { service, description, queueId, priority, reason, channel } = req.body;
@@ -80,6 +88,13 @@ router.patch("/counters/:id/call-next", requireAuth, async (req, res) => {
   next.counterId = counter._id;
   await next.save();
 
+  counter.servingToken = next.token;
+  await counter.save();
+
+  await logAudit("Staff", "Called next", `#${next.token}`, "WAITING", "CALLED");
+
+  res.json({ counter, request: next });
+});
 
 router.patch("/counters/:id/call-token", requireAuth, async (req, res) => {
   const { token } = req.body;
@@ -99,13 +114,6 @@ router.patch("/counters/:id/call-token", requireAuth, async (req, res) => {
   await logAudit("Staff", "Called by token", `#${target.token}`, "WAITING", "CALLED");
 
   res.json({ counter, request: target });
-});
-  counter.servingToken = next.token;
-  await counter.save();
-
-  await logAudit("Staff", "Called next", `#${next.token}`, "WAITING", "CALLED");
-
-  res.json({ counter, request: next });
 });
 
 router.patch("/counters/:id/start", requireAuth, async (req, res) => {
@@ -224,12 +232,4 @@ router.patch("/queues/:id/toggle-pause", requireAuth, async (req, res) => {
   res.json(queue);
 });
 
-
-router.get("/requests/history", requireAuth, async (req, res) => {
-  const history = await Request.find({
-    owner: req.user.id,
-    status: { $in: ["COMPLETED", "LEFT"] },
-  }).sort({ submittedAt: -1 });
-  res.json(history);
-});
 export default router;
