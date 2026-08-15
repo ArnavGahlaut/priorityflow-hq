@@ -80,6 +80,26 @@ router.patch("/counters/:id/call-next", requireAuth, async (req, res) => {
   next.counterId = counter._id;
   await next.save();
 
+
+router.patch("/counters/:id/call-token", requireAuth, async (req, res) => {
+  const { token } = req.body;
+  const counter = await Counter.findById(req.params.id);
+  if (!counter) return res.status(404).json({ error: "Counter not found" });
+
+  const target = await Request.findOne({ token: Number(token), status: "WAITING" });
+  if (!target) return res.status(404).json({ error: "No waiting request with that token" });
+
+  target.status = "CALLED";
+  target.counterId = counter._id;
+  await target.save();
+
+  counter.servingToken = target.token;
+  await counter.save();
+
+  await logAudit("Staff", "Called by token", `#${target.token}`, "WAITING", "CALLED");
+
+  res.json({ counter, request: target });
+});
   counter.servingToken = next.token;
   await counter.save();
 

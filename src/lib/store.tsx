@@ -63,6 +63,7 @@ interface Store {
   positionOf: (id: string) => number;
   etaMinutesFor: (id: string) => number;
   callNext: (counterId: string) => void;
+  callByToken: (counterId: string, token: number) => void;
   startService: (counterId: string) => void;
   complete: (counterId: string) => void;
   transfer: (requestId: string, queueId: QueueId) => void;
@@ -105,49 +106,50 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
-  const token = getToken();
-  if (!token) {
-    setLoading(false);
-    return;
-  }
-  try {
-    const [reqRes, counterRes, queueRes] = await Promise.all([
-      fetch(`${API_BASE}/requests`, { headers: authHeaders() }),
-      fetch(`${API_BASE}/counters`, { headers: authHeaders() }),
-      fetch(`${API_BASE}/queues`, { headers: authHeaders() }),
-    ]);
-    if (reqRes.ok) {
-      const data = await reqRes.json();
-      setRequests(data.map((r: any) => ({ ...r, id: r._id })));
+    const token = getToken();
+    if (!token) {
+      setLoading(false);
+      return;
     }
-    if (counterRes.ok) {
-      const data = await counterRes.json();
-      setCounters((prev) =>
-        data.map((c: any) => {
-          const existing = prev.find((p) => p.id === c._id);
-          const keepElapsed =
-            existing && existing.status === "SERVING" && c.status === "SERVING";
-          return {
-            ...c,
-            id: c._id,
-            elapsedSeconds: keepElapsed ? existing.elapsedSeconds : c.elapsedSeconds,
-          };
-        }),
-      );
+    try {
+      const [reqRes, counterRes, queueRes] = await Promise.all([
+        fetch(`${API_BASE}/requests`, { headers: authHeaders() }),
+        fetch(`${API_BASE}/counters`, { headers: authHeaders() }),
+        fetch(`${API_BASE}/queues`, { headers: authHeaders() }),
+      ]);
+      if (reqRes.ok) {
+        const data = await reqRes.json();
+        setRequests(data.map((r: any) => ({ ...r, id: r._id })));
+      }
+      if (counterRes.ok) {
+        const data = await counterRes.json();
+        setCounters((prev) =>
+          data.map((c: any) => {
+            const existing = prev.find((p) => p.id === c._id);
+            const keepElapsed =
+              existing && existing.status === "SERVING" && c.status === "SERVING";
+            return {
+              ...c,
+              id: c._id,
+              elapsedSeconds: keepElapsed ? existing.elapsedSeconds : c.elapsedSeconds,
+            };
+          }),
+        );
+      }
+      if (queueRes.ok) setQueues(await queueRes.json());
+    } catch (err) {
+      console.error("Failed to fetch queue data", err);
+    } finally {
+      setLoading(false);
     }
-    if (queueRes.ok) setQueues(await queueRes.json());
-  } catch (err) {
-    console.error("Failed to fetch queue data", err);
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  }, []);
 
   useEffect(() => {
     fetchAll();
     const poll = setInterval(fetchAll, 4000);
     return () => clearInterval(poll);
   }, [fetchAll]);
+
   useEffect(() => {
     const tick = setInterval(() => {
       setCounters((prev) =>
@@ -158,8 +160,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, 1000);
     return () => clearInterval(tick);
   }, []);
-
-
 
   const waiting = useMemo(
     () =>
@@ -179,16 +179,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ),
     [requests],
   );
+
   const serving = useMemo(() => requests.filter((r) => r.status === "SERVING"), [requests]);
-  const myRequest = useMemo(
-    () => {
-      const user = getUser();
-      return requests.find(
-        (r) => r.owner === user?.id && r.status !== "COMPLETED" && r.status !== "LEFT",
-      );
-    },
-    [requests],
-  );
+
+  const myRequest = useMemo(() => {
+    const user = getUser();
+    return requests.find(
+      (r) => r.owner === user?.id && r.status !== "COMPLETED" && r.status !== "LEFT",
+    );
+  }, [requests]);
 
   const metrics = useMemo(() => {
     const waitSum = waiting.reduce((acc, r) => acc + r.waitedMinutes, 0);
@@ -243,6 +242,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const data = await res.json();
         if (!res.ok) {
           toast.error(data.error || "Could not call next");
+          return;
+        }
+        toast.success(`Token #${data.request.token} called`);
+        fetchAll();
+      } catch {
+        toast.error("Network error");
+      }
+    },
+    [fetchAll],
+  );
+
+  const callByToken = useCallback(
+    async (counterId: string, token: number) => {
+      try {
+        const res = await fetch(`${API_BASE}/counters/${counterId}/call-token`, {
+          method: "PATCH",
+          headers: authHeaders(),
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || "Could not call token");
           return;
         }
         toast.success(`Token #${data.request.token} called`);
@@ -326,96 +347,95 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [fetchAll],
   );
 
-  // --- Not yet backed by API (kept local so UI doesn't break) ---
   const transfer = useCallback(
-  async (requestId: string, queueId: QueueId) => {
-    const res = await fetch(`${API_BASE}/requests/${requestId}/transfer`, {
-      method: "PATCH",
-      headers: authHeaders(),
-      body: JSON.stringify({ queueId }),
-    });
-    if (res.ok) {
-      toast.success("Transferred");
-      fetchAll();
-    } else toast.error("Transfer failed");
-  },
-  [fetchAll],
-);
+    async (requestId: string, queueId: QueueId) => {
+      const res = await fetch(`${API_BASE}/requests/${requestId}/transfer`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ queueId }),
+      });
+      if (res.ok) {
+        toast.success("Transferred");
+        fetchAll();
+      } else toast.error("Transfer failed");
+    },
+    [fetchAll],
+  );
 
-const toggleQueuePause = useCallback(
-  async (queueId: QueueId) => {
-    const res = await fetch(`${API_BASE}/queues/${queueId}/toggle-pause`, {
-      method: "PATCH",
-      headers: authHeaders(),
-    });
-    if (res.ok) {
-      toast.success("Queue updated");
-      fetchAll();
-    } else toast.error("Failed");
-  },
-  [fetchAll],
-);
+  const toggleQueuePause = useCallback(
+    async (queueId: QueueId) => {
+      const res = await fetch(`${API_BASE}/queues/${queueId}/toggle-pause`, {
+        method: "PATCH",
+        headers: authHeaders(),
+      });
+      if (res.ok) {
+        toast.success("Queue updated");
+        fetchAll();
+      } else toast.error("Failed");
+    },
+    [fetchAll],
+  );
 
-const toggleCounterPause = useCallback((_counterId: string) => {
-  toast.message("Counter pause coming soon");
-}, []);
+  const toggleCounterPause = useCallback((_counterId: string) => {
+    toast.message("Counter pause coming soon");
+  }, []);
 
-const setPriority = useCallback(
-  async (requestId: string, priority: Priority) => {
-    const res = await fetch(`${API_BASE}/requests/${requestId}/priority`, {
-      method: "PATCH",
-      headers: authHeaders(),
-      body: JSON.stringify({ priority }),
-    });
-    if (res.ok) {
-      toast.success(`Priority set to ${priority}`);
-      fetchAll();
-    } else toast.error("Failed");
-  },
-  [fetchAll],
-);
+  const setPriority = useCallback(
+    async (requestId: string, priority: Priority) => {
+      const res = await fetch(`${API_BASE}/requests/${requestId}/priority`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ priority }),
+      });
+      if (res.ok) {
+        toast.success(`Priority set to ${priority}`);
+        fetchAll();
+      } else toast.error("Failed");
+    },
+    [fetchAll],
+  );
 
-const confirmPriority = useCallback(
-  async (requestId: string) => {
-    const res = await fetch(`${API_BASE}/requests/${requestId}/confirm`, {
-      method: "PATCH",
-      headers: authHeaders(),
-    });
-    if (res.ok) {
-      toast.success("Confirmed");
-      fetchAll();
-    } else toast.error("Failed");
-  },
-  [fetchAll],
-);
+  const confirmPriority = useCallback(
+    async (requestId: string) => {
+      const res = await fetch(`${API_BASE}/requests/${requestId}/confirm`, {
+        method: "PATCH",
+        headers: authHeaders(),
+      });
+      if (res.ok) {
+        toast.success("Confirmed");
+        fetchAll();
+      } else toast.error("Failed");
+    },
+    [fetchAll],
+  );
 
-const sendForReview = useCallback(
-  async (requestId: string) => {
-    const res = await fetch(`${API_BASE}/requests/${requestId}/review`, {
-      method: "PATCH",
-      headers: authHeaders(),
-    });
-    if (res.ok) {
-      toast.success("Sent for review");
-      fetchAll();
-    } else toast.error("Failed");
-  },
-  [fetchAll],
-);
+  const sendForReview = useCallback(
+    async (requestId: string) => {
+      const res = await fetch(`${API_BASE}/requests/${requestId}/review`, {
+        method: "PATCH",
+        headers: authHeaders(),
+      });
+      if (res.ok) {
+        toast.success("Sent for review");
+        fetchAll();
+      } else toast.error("Failed");
+    },
+    [fetchAll],
+  );
 
-const leaveQueue = useCallback(
-  async (requestId: string) => {
-    const res = await fetch(`${API_BASE}/requests/${requestId}/leave`, {
-      method: "PATCH",
-      headers: authHeaders(),
-    });
-    if (res.ok) {
-      toast.success("Left queue");
-      fetchAll();
-    } else toast.error("Failed");
-  },
-  [fetchAll],
-);
+  const leaveQueue = useCallback(
+    async (requestId: string) => {
+      const res = await fetch(`${API_BASE}/requests/${requestId}/leave`, {
+        method: "PATCH",
+        headers: authHeaders(),
+      });
+      if (res.ok) {
+        toast.success("Left queue");
+        fetchAll();
+      } else toast.error("Failed");
+    },
+    [fetchAll],
+  );
 
   const toggleRule = useCallback((_ruleId: string) => {}, []);
   const updateRule = useCallback((_ruleId: string, _patch: Partial<PriorityRule>) => {}, []);
@@ -440,6 +460,7 @@ const leaveQueue = useCallback(
     positionOf,
     etaMinutesFor,
     callNext,
+    callByToken,
     startService,
     complete,
     transfer,

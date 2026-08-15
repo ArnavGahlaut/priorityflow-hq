@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { PhoneCall, Pause, Play, Check, ArrowRightLeft } from "lucide-react";
-import type { ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 
 import { Disclaimer, PageHeader } from "@/components/app-shell";
 import { MetricCard, Panel } from "@/components/metric-card";
@@ -37,12 +37,15 @@ function OperationsCenter() {
     counters,
     queues,
     callNext,
+    callByToken,
     startService,
     complete,
     transfer,
     toggleQueuePause,
     requests,
   } = useStore();
+
+  const [tokenInputs, setTokenInputs] = useState<Record<string, string>>({});
 
   return (
     <>
@@ -137,6 +140,26 @@ function OperationsCenter() {
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <ActionButton onClick={() => callNext(c.id)} icon={PhoneCall} label="Call next" />
+                      <input
+                        value={tokenInputs[c.id] || ""}
+                        onChange={(e) =>
+                          setTokenInputs((prev) => ({ ...prev, [c.id]: e.target.value }))
+                        }
+                        placeholder="Token #"
+                        className="w-20 border border-border bg-background px-2 py-1 text-xs outline-none"
+                      />
+                      <button
+                        onClick={() => {
+                          const tok = Number(tokenInputs[c.id]);
+                          if (tok) {
+                            callByToken(c.id, tok);
+                            setTokenInputs((prev) => ({ ...prev, [c.id]: "" }));
+                          }
+                        }}
+                        className="border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        Call token
+                      </button>
                       <ActionButton onClick={() => startService(c.id)} icon={Play} label="Start" />
                       <ActionButton onClick={() => complete(c.id)} icon={Check} label="Complete" />
                       {active ? (
